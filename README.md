@@ -1,4 +1,4 @@
-![Platform](https://img.shields.io/badge/platform-osx%20%7C%20ios%20%7C%20tvos-lightgrey.svg) 
+![Static Badge](https://img.shields.io/badge/Platform-iOS_%7C_macOS-blue)
 
 # HackAI2025
 
