@@ -1,8 +1,8 @@
 ![Static Badge](https://img.shields.io/badge/Platform-iOS_%7C_macOS-blue)
 
-# HackAI2025
+# Dentelligence
 
-HackAI2025 is a dental treatment management application that allows healthcare professionals to record patient treatments, generate reports, and manage audio recordings of patient interactions. The app leverages AVFoundation for audio recording and Whisper for transcription, providing a seamless experience for dental professionals.
+Dentelligence is a dental treatment management application that allows healthcare professionals to record patient treatments, generate reports, and manage audio recordings of patient interactions. The app leverages AVFoundation for audio recording and Whisper for transcription, providing a seamless experience for dental professionals.
 
 ## Features
 
@@ -14,7 +14,7 @@ HackAI2025 is a dental treatment management application that allows healthcare p
 
 ## Installation
 
-To get started with HackAI2025, follow these steps:
+To get started with Dentelligence, follow these steps:
 
 1. **Clone the repository**:
    ```bash
@@ -46,7 +46,7 @@ To get started with HackAI2025, follow these steps:
 
 ## Contributing
 
-Contributions are welcome! If you would like to contribute to HackAI2025, please follow these steps:
+Contributions are welcome! If you would like to contribute to Dentelligence, please follow these steps:
 
 1. **Fork the repository**.
 2. **Create a new branch** for your feature or bug fix:
