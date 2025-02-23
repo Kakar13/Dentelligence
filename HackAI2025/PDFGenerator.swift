@@ -12,7 +12,7 @@ import PDFKit
 class PDFGenerator {
     static func generatePDF(from treatment: Treatment) -> Data? {
         let pdfMetaData = [
-            kCGPDFContextCreator: "Tooth Mechanic",
+            kCGPDFContextCreator: "Dentelligence",
             kCGPDFContextAuthor: "Dental Professional"
         ]
         let format = UIGraphicsPDFRendererFormat()

@@ -8,19 +8,20 @@ struct HomeView: View {
     var patient = Patient(name: "John Doe", dateOfBirth: Date(), gender: "Male", treatments: [])
     var body: some View {
         NavigationStack {
-            VStack(spacing: 30) {
+            VStack(spacing: 32) {
                 
                 // App Title
-                Text("Tooth Mechanic")
+                Text("Dentelligence")
                     .font(.largeTitle)
-                    .bold()
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
     
                 
                 // Logo Image
                 Image("tooth")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 200, height: 100)
+                    .frame(width: 500, height: 500)
                 
                 Spacer()
                 
