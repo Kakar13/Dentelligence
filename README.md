@@ -1,3 +1,5 @@
+![Static Badge](https://img.shields.io/badge/Platform-iOS_%7C_macOS-blue)
+
 # HackAI2025
 
 HackAI2025 is a dental treatment management application that allows healthcare professionals to record patient treatments, generate reports, and manage audio recordings of patient interactions. The app leverages AVFoundation for audio recording and Whisper for transcription, providing a seamless experience for dental professionals.
@@ -70,7 +72,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [AVFoundation](https://developer.apple.com/documentation/avfoundation) for audio recording capabilities.
 - [Whisper](https://github.com/exPHAT/SwiftWhisper) for transcription services.
 - [SwiftUI](https://developer.apple.com/xcode/swiftui/) for building the user interface.
-
----
-
-Feel free to customize this README file further to suit your project's specific needs and details!
