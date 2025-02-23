@@ -74,3 +74,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ---
 
 Feel free to customize this README file further to suit your project's specific needs and details!
+![Platform](https://img.shields.io/badge/platform-osx%20%7C%20ios%20%7C%20tvos-lightgrey.svg)
