@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7B7B94832D6B081A0055DA72 /* SwiftWhisper in Frameworks */ = {isa = PBXBuildFile; productRef = 7B7B94822D6B081A0055DA72 /* SwiftWhisper */; };
+		7B7B94862D6B09890055DA72 /* AudioKit in Frameworks */ = {isa = PBXBuildFile; productRef = 7B7B94852D6B09890055DA72 /* AudioKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		0332EA2E2D6A828700807338 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -42,6 +47,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B7B94862D6B09890055DA72 /* AudioKit in Frameworks */,
+				7B7B94832D6B081A0055DA72 /* SwiftWhisper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,6 +107,8 @@
 			);
 			name = HackAI2025;
 			packageProductDependencies = (
+				7B7B94822D6B081A0055DA72 /* SwiftWhisper */,
+				7B7B94852D6B09890055DA72 /* AudioKit */,
 			);
 			productName = HackAI2025;
 			productReference = 0332EA1B2D6A828600807338 /* HackAI2025.app */;
@@ -177,6 +186,10 @@
 			);
 			mainGroup = 0332EA122D6A828600807338;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7B7B94812D6B081A0055DA72 /* XCRemoteSwiftPackageReference "SwiftWhisper" */,
+				7B7B94842D6B09890055DA72 /* XCRemoteSwiftPackageReference "AudioKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0332EA1C2D6A828600807338 /* Products */;
 			projectDirPath = "";
@@ -394,6 +407,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mihirjoe.HackAI2025;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -424,6 +440,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mihirjoe.HackAI2025;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -542,6 +561,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7B7B94812D6B081A0055DA72 /* XCRemoteSwiftPackageReference "SwiftWhisper" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/exPHAT/SwiftWhisper.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.0;
+			};
+		};
+		7B7B94842D6B09890055DA72 /* XCRemoteSwiftPackageReference "AudioKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/AudioKit/AudioKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.6.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7B7B94822D6B081A0055DA72 /* SwiftWhisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B7B94812D6B081A0055DA72 /* XCRemoteSwiftPackageReference "SwiftWhisper" */;
+			productName = SwiftWhisper;
+		};
+		7B7B94852D6B09890055DA72 /* AudioKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B7B94842D6B09890055DA72 /* XCRemoteSwiftPackageReference "AudioKit" */;
+			productName = AudioKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0332EA132D6A828600807338 /* Project object */;
 }

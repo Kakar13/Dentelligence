@@ -3,6 +3,90 @@
 import SwiftData
 import Foundation
 import SwiftUI
+import SwiftWhisper
+
+class WhisperTranscriptionService {
+    static let shared = WhisperTranscriptionService() // Singleton
+    
+    private var whisper: Whisper?
+    
+    private init() { // Make initializer private for singleton
+        guard let modelPath = Bundle.main.path(forResource: "ggml-base.en", ofType: "bin") else {
+            print("Whisper model not found!")
+            return
+        }
+        whisper = Whisper(fromFileURL: URL(fileURLWithPath: modelPath))
+    }
+    
+    func transcribe(audioURL: URL, completion: @escaping (String) -> Void) {
+        guard let whisper = whisper else {
+            print("Whisper model not loaded!")
+            return
+        }
+        
+        convertAudioToPCM(fileURL: audioURL) { result in
+            switch result {
+            case .success(let audioFrames):
+                Task {
+                    do {
+                        let segments = try await whisper.transcribe(audioFrames: audioFrames)
+                        let transcription = segments.map(\.text).joined()
+                        DispatchQueue.main.async {
+                            completion(transcription)
+                        }
+                    } catch {
+                        print("Whisper transcription failed: \(error)")
+                        DispatchQueue.main.async {
+                            completion("Transcription failed.")
+                        }
+                    }
+                }
+                
+            case .failure(let error):
+                print("Audio conversion failed: \(error)")
+                completion("Audio processing failed.")
+            }
+        }
+    }
+}
+
+import AudioKit
+
+func convertAudioToPCM(fileURL: URL, completion: @escaping (Result<[Float], Error>) -> Void) {
+    var options = FormatConverter.Options()
+    options.format = .wav
+    options.sampleRate = 16000
+    options.bitDepth = 16
+    options.channels = 1
+    options.isInterleaved = false
+
+    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+
+    let converter = FormatConverter(inputURL: fileURL, outputURL: tempURL, options: options)
+    converter.start { error in
+        if let error {
+            completion(.failure(error))
+            return
+        }
+
+        let data = try! Data(contentsOf: tempURL) // Handle error properly
+
+        let floats = stride(from: 44, to: data.count, by: 2).map {
+            return data[$0..<$0 + 2].withUnsafeBytes {
+                let short = Int16(littleEndian: $0.load(as: Int16.self))
+                return max(-1.0, min(Float(short) / 32767.0, 1.0))
+            }
+        }
+
+        try? FileManager.default.removeItem(at: tempURL)
+
+        completion(.success(floats))
+    }
+}
+
+
+
+
 
 // MARK: - Updated Models
 @Model
@@ -107,75 +191,61 @@ import AVFoundation
 import Speech
 import PDFKit
 
-// MARK: - Updated AudioRecordingService
+import AVFoundation
+import SwiftWhisper
+
 class AudioRecordingService: ObservableObject {
     private var audioRecorder: AVAudioRecorder?
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))!
-    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    private var recognitionTask: SFSpeechRecognitionTask?
-    private var audioEngine = AVAudioEngine()
     private var recordingURL: URL?
-    
+    private let whisperService = WhisperTranscriptionService.shared
+//    private let whisperService = WhisperTranscriptionService()
+
     @Published var isRecording = false
     @Published var transcribedText = ""
-    
+
     func startRecording() throws {
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
         try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-        
-        // Use a persistent file instead of a temporary file
+
+        // Define recording file location
         let tempDirectory = FileManager.default.temporaryDirectory
-        let audioFilename = tempDirectory.appendingPathComponent("continuous_recording.m4a")
-        recordingURL = audioFilename  // Preserve the recording URL for later
-        
+        let audioFilename = tempDirectory.appendingPathComponent("recording.m4a")
+        recordingURL = audioFilename
+
         let settings = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 12000,
+            AVSampleRateKey: 16000, // Whisper requires 16kHz audio
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
-        
-        // Check if a previous recording exists and append to it
-        if FileManager.default.fileExists(atPath: audioFilename.path) {
-            let fileHandle = try FileHandle(forWritingTo: audioFilename)
-            fileHandle.seekToEndOfFile()  // Append new data at the end
-        } else {
-            audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
-            audioRecorder?.record()
-        }
-        
-        let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        self.recognitionRequest = recognitionRequest
-        
-        let inputNode = audioEngine.inputNode
-        recognitionRequest.shouldReportPartialResults = true
-        
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            if let result = result {
-                self?.transcribedText = result.bestTranscription.formattedString
-            }
-        }
-        
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
-        }
-        
-        audioEngine.prepare()
-        try audioEngine.start()
+
+        audioRecorder = try AVAudioRecorder(url: audioFilename, settings: settings)
+        audioRecorder?.record()
         isRecording = true
     }
 
-    
     func stopRecording() -> URL? {
-        audioEngine.stop()
-        recognitionRequest?.endAudio()
         audioRecorder?.stop()
         isRecording = false
-        return recordingURL  // Preserve the recorded file path instead of discarding it
+        return recordingURL
+    }
+
+    func transcribeRecording(completion: @escaping (String) -> Void) {
+        guard let recordingURL else {
+            completion("No recording found.")
+            return
+        }
+
+        whisperService.transcribe(audioURL: recordingURL) { result in
+            DispatchQueue.main.async {
+                self.transcribedText = result
+                completion(result)
+            }
+        }
     }
 }
+
 
 class AudioPlayerService: NSObject, ObservableObject {
     private var audioPlayer: AVAudioPlayer?
@@ -259,64 +329,127 @@ extension AudioPlayerService: AVAudioPlayerDelegate {
     }
 }
 
-// Update PDFGenerator to include new fields
+import UIKit
+import PDFKit
+
 class PDFGenerator {
     static func generatePDF(from treatment: Treatment) -> Data? {
-        let pdfRenderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792))
+        let pdfMetaData = [
+            kCGPDFContextCreator: "Dentology",
+            kCGPDFContextAuthor: "Dental Professional"
+        ]
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = pdfMetaData as [String: Any]
+
+        let pageWidth = 8.5 * 72.0
+        let pageHeight = 11 * 72.0
+        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
         
-        return try? pdfRenderer.pdfData { context in
+        // Define margins with smaller top margin
+        let margins = UIEdgeInsets(top: 36, left: 50, bottom: 36, right: 50)
+        let textRect = pageRect.inset(by: margins)
+
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        return renderer.pdfData { context in
+            let titleAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont(name: "Times New Roman Bold", size: 14) ?? UIFont.systemFont(ofSize: 14, weight: .bold),
+                .foregroundColor: UIColor.black,
+                .paragraphStyle: {
+                    let style = NSMutableParagraphStyle()
+                    style.lineSpacing = 4
+                    style.paragraphSpacing = 8
+                    return style
+                }()
+            ]
+            
+            let bodyAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor.black,
+                .paragraphStyle: {
+                    let style = NSMutableParagraphStyle()
+                    style.lineSpacing = 4
+                    style.paragraphSpacing = 4
+                    style.lineBreakMode = .byWordWrapping
+                    return style
+                }()
+            ]
+
+            var currentY = margins.top
+            
+            func drawTextBlock(_ text: String, attributes: [NSAttributedString.Key: Any], isTitle: Bool = false) -> CGFloat {
+                let attributedString = NSAttributedString(string: text, attributes: attributes)
+                let textStorage = NSTextStorage(attributedString: attributedString)
+                let layoutManager = NSLayoutManager()
+                textStorage.addLayoutManager(layoutManager)
+                
+                let textContainer = NSTextContainer(size: CGSize(
+                    width: textRect.width,
+                    height: .greatestFiniteMagnitude
+                ))
+                textContainer.lineFragmentPadding = 0
+                layoutManager.addTextContainer(textContainer)
+                
+                var textPosition = 0
+                var localY = currentY
+                
+                while textPosition < attributedString.length {
+                    if localY > pageHeight - margins.bottom - 20 {
+                        context.beginPage()
+                        localY = margins.top
+                    }
+                    
+                    let glyphRange = layoutManager.glyphRange(forBoundingRect:
+                        CGRect(x: 0, y: 0, width: textRect.width, height: pageHeight - localY - margins.bottom),
+                        in: textContainer
+                    )
+                    
+                    let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+                    
+                    if characterRange.length > 0 {
+                        layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: CGPoint(x: margins.left, y: localY))
+                        
+                        let fragmentRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+                        localY += fragmentRect.height
+                        textPosition += characterRange.length
+                    } else {
+                        break
+                    }
+                }
+                
+                return localY + (isTitle ? 4 : 8)
+            }
+            
+            // Create first page
             context.beginPage()
             
+            // Draw title
+            currentY = drawTextBlock("Dental Treatment Report", attributes: titleAttributes, isTitle: true)
+            
+            // Draw patient information
             let dateFormatter = DateFormatter()
             dateFormatter.dateStyle = .long
             
-            let dobFormatter = DateFormatter()
-            dobFormatter.dateStyle = .long
-            
-            let title = "Dental Treatment Report"
-//            let patientName = "Patient: \(treatment.patient?.name ?? "Unknown")"
-            let patientName = "Patient: \(treatment.patient?.name ?? "Unknown")"
-            let patientDOB = "Date of Birth: \(dobFormatter.string(from: treatment.patient?.dateOfBirth ?? Date()))"
-            let patientGender = "Gender: \(treatment.patient?.gender ?? "Unknown")"
-            let treatmentName = "Treatment: \(treatment.name)"
-            let date = "Date: \(dateFormatter.string(from: treatment.date))"
-            let transcription = treatment.transcription
-            
-            let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 24)
+            let patientInfo = [
+                "Patient: \(treatment.patient?.name ?? "Unknown")",
+                "Date of Birth: \(dateFormatter.string(from: treatment.patient?.dateOfBirth ?? Date()))",
+                "Gender: \(treatment.patient?.gender ?? "Unknown")",
+                "Treatment: \(treatment.name)",
+                "Date: \(dateFormatter.string(from: treatment.date))"
             ]
             
-            let headerAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 14)
-            ]
+            for info in patientInfo {
+                currentY = drawTextBlock(info, attributes: bodyAttributes)
+            }
             
-            let textAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 12)
-            ]
-            
-            // Draw the title and headers with adjusted vertical spacing
-            title.draw(at: CGPoint(x: 50, y: 50), withAttributes: titleAttributes)
-            patientName.draw(at: CGPoint(x: 50, y: 100), withAttributes: headerAttributes)
-            patientDOB.draw(at: CGPoint(x: 50, y: 120), withAttributes: headerAttributes)
-            patientGender.draw(at: CGPoint(x: 50, y: 140), withAttributes: headerAttributes)
-            treatmentName.draw(at: CGPoint(x: 50, y: 160), withAttributes: headerAttributes)
-            date.draw(at: CGPoint(x: 50, y: 180), withAttributes: headerAttributes)
-            
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.lineSpacing = 5
-            
-            // Adjust the starting y-position of the transcription to account for new fields
-            transcription.draw(in: CGRect(x: 50, y: 220, width: 512, height: 522),
-                             withAttributes: [
-                                .font: UIFont.systemFont(ofSize: 12),
-                                .paragraphStyle: paragraphStyle
-                             ])
+            // Draw transcription
+            currentY = drawTextBlock("Transcription:", attributes: titleAttributes, isTitle: true)
+            currentY = drawTextBlock(treatment.transcription, attributes: bodyAttributes)
         }
     }
 }
 
 
-// MARK: - Views
 import SwiftUI
 
 struct HomeView: View {
@@ -325,35 +458,49 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 30) {
+                
+                // App Title
                 Text("Dentology")
                     .font(.largeTitle)
                     .bold()
                 
+                // Logo Image
+                Image("tooth")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 200, height: 100)
                 
-                NavigationLink(destination: NewReportView(patient: patient)) {
-                    Label("New Report", systemImage: "plus.circle.fill")
-                        .font(.title3)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
+                Spacer()
                 
-                NavigationLink(destination: ReportsListView()) {
-                    Label("View Reports", systemImage: "list.bullet.clipboard")
-                        .font(.title3)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                // Navigation Buttons
+                VStack(spacing: 15) {
+                    NavigationLink(destination: NewReportView(patient: patient)) {
+                        Label("New Report", systemImage: "plus.circle.fill")
+                            .font(.title3)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    
+                    NavigationLink(destination: ReportsListView()) {
+                        Label("View Reports", systemImage: "list.bullet.clipboard")
+                            .font(.title3)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
                 }
+                .padding(.bottom, 30)
             }
             .padding()
         }
     }
 }
+
 
 // MARK: - NewReportView
 struct NewReportView: View {
@@ -421,11 +568,15 @@ struct NewReportView: View {
 }
 
 struct RecordingView: View {
-    @StateObject private var audioService = AudioRecordingService()
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var showingReport = false
     @State private var currentTreatment: Treatment?
+    @State private var transcribedText = ""
+    @State private var modelResponse: String = ""
+    @State private var isLoading: Bool = false
+    @StateObject private var audioService = AudioRecordingService()
+    private let transcriptionService = WhisperTranscriptionService.shared
     
     let patient: Patient
     let treatmentName: String
@@ -433,13 +584,11 @@ struct RecordingView: View {
     var body: some View {
         VStack {
             ScrollView {
-                Text(audioService.transcribedText)
+                Text(modelResponse.isEmpty ? transcribedText : modelResponse)
                     .padding()
             }
             
-            Spacer()
-            
-            if !audioService.isRecording && !audioService.transcribedText.isEmpty {
+            if !audioService.isRecording && !transcribedText.isEmpty && !isLoading {
                 Button("View Report") {
                     generateAndShowReport()
                 }
@@ -447,10 +596,19 @@ struct RecordingView: View {
                 .padding()
             } else {
                 Button(action: {
-                    if audioService.isRecording {
-                        let _ = audioService.stopRecording()
-                    } else {
-                        try? audioService.startRecording()
+                    Task {
+                        if audioService.isRecording {
+                            if let audioURL = audioService.stopRecording() {
+                                audioService.transcribeRecording { result in
+                                    Task {
+                                        transcribedText = result
+                                        await generateModelResponse() // Send to AWS after transcription
+                                    }
+                                }
+                            }
+                        } else {
+                            try? audioService.startRecording()
+                        }
                     }
                 }) {
                     Image(systemName: audioService.isRecording ? "stop.circle.fill" : "mic.circle.fill")
@@ -458,8 +616,12 @@ struct RecordingView: View {
                         .frame(width: 64, height: 64)
                         .foregroundColor(audioService.isRecording ? .red : .blue)
                 }
+
                 .padding()
             }
+        }
+        .onChange(of: modelResponse) { _, newValue in
+            transcribedText = newValue
         }
         .navigationTitle("Recording")
         .navigationDestination(isPresented: $showingReport) {
@@ -469,38 +631,97 @@ struct RecordingView: View {
         }
     }
     
+    private func transcribeWithWhisper(audioURL: URL) async -> String {
+        return await withCheckedContinuation { continuation in
+            transcriptionService.transcribe(audioURL: audioURL) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+    
+    private func generateModelResponse() async {
+        let treatment = Treatment(name: treatmentName, transcription: transcribedText)
+        isLoading = true
+        modelResponse = ""
+
+        modelResponse = await fetchResponse(treatment: treatment)
+        isLoading = false
+    }
+    
     private func generateAndShowReport() {
-        // Create a new treatment and set its relationship with the patient
-        let treatment = Treatment(name: treatmentName, transcription: audioService.transcribedText)
+        let treatment = Treatment(name: treatmentName, transcription: transcribedText)
         treatment.patient = patient
         
-        // Save audio file if available
         if let sourceURL = audioService.stopRecording() {
-            if let savedURL = FileManagerService.shared.saveAudioFile(
-                from: sourceURL,
-                treatmentId: treatment.id
-            ) {
+            if let savedURL = FileManagerService.shared.saveAudioFile(from: sourceURL, treatmentId: treatment.id) {
                 treatment.audioFilePath = "\(treatment.id)/recording.m4a"
             }
         }
         
-        // Generate and save PDF
         if let pdfData = PDFGenerator.generatePDF(from: treatment),
-           let savedURL = FileManagerService.shared.savePDFFile(
-            data: pdfData,
-            treatmentId: treatment.id
-           ) {
+           let savedURL = FileManagerService.shared.savePDFFile(data: pdfData, treatmentId: treatment.id) {
             treatment.pdfFilePath = "\(treatment.id)/report.pdf"
         }
         
-        // Insert the patient into the model context if it's not already there
         modelContext.insert(patient)
-        
-        // Add the treatment to the patient's treatments array
         patient.treatments.append(treatment)
         
         currentTreatment = treatment
         showingReport = true
+    }
+}
+
+// MARK: - Fetch Response from AWS
+func fetchResponse(treatment: Treatment) async -> String {
+    return await generateSectionResponse(sectionTitle: treatment.name, transcript: treatment.transcription)
+}
+
+func generateSectionResponse(sectionTitle: String, transcript: String) async -> String {
+    guard let jsonData = createSectionPrompt(sectionTitle: sectionTitle, transcript: transcript) else {
+        return "Error occurred while generating request body"
+    }
+    
+    do {
+        let result = try await makeAPICall(with: jsonData)
+        return result.output
+    } catch {
+        print("Error in API call: \(error.localizedDescription)")
+        return "Error occurred while generating response"
+    }
+}
+
+func createSectionPrompt(sectionTitle: String, transcript: String) -> Data? {
+    let formattedPrompt = ["sectionTitle": sectionTitle, "inputData": "for the \(sectionTitle) section, include the following: \(transcript)."]
+    
+    do {
+        return try JSONSerialization.data(withJSONObject: formattedPrompt)
+    } catch {
+        return nil
+    }
+}
+
+func makeAPICall(with jsonData: Data) async throws -> Response {
+    guard let apiKey = ProcessInfo.processInfo.environment["API_KEY"],
+          let url = URL(string: apiKey) else {
+        throw URLError(.badURL)
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = jsonData
+
+    let (data, _) = try await URLSession.shared.data(for: request)
+
+    do {
+        return try JSONDecoder().decode(Response.self, from: data)
+    } catch {
+        if let jsonResult = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+           let output = jsonResult["output"] as? String {
+            return Response(sessionID: "unknown", prompt: "unknown", output: output)
+        } else {
+            throw error
+        }
     }
 }
 
@@ -699,12 +920,15 @@ struct PDFKitView: UIViewRepresentable {
     
     func makeUIView(context: Context) -> PDFView {
         let pdfView = PDFView()
-        pdfView.document = PDFDocument(url: url)
-        pdfView.autoScales = true
+        pdfView.autoScales = true // To fit the content in the view
         return pdfView
     }
     
-    func updateUIView(_ uiView: PDFView, context: Context) {}
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        if let document = PDFDocument(url: url) {
+            uiView.document = document
+        }
+    }
 }
 
 
@@ -729,3 +953,4 @@ struct HackAI2025: App {
         .modelContainer(container)
     }
 }
+
