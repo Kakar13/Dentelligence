@@ -30,7 +30,7 @@ To get started with HackAI2025, follow these steps:
    ```
 
 4. **Install dependencies**:
-   Make sure to install any required dependencies using Swift Package Manager or CocoaPods, as specified in the project.
+   Ensure that required dependencies are installed using Swift Package Manager or CocoaPods, as specified in the project.
 
 5. **Run the app**:
    Select a simulator or a physical device and click the run button in Xcode.
