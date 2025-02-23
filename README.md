@@ -72,7 +72,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [AVFoundation](https://developer.apple.com/documentation/avfoundation) for audio recording capabilities.
 - [Whisper](https://github.com/exPHAT/SwiftWhisper) for transcription services.
 - [SwiftUI](https://developer.apple.com/xcode/swiftui/) for building the user interface.
-
----
-
-Feel free to customize this README file further to suit your project's specific needs and details!
