@@ -448,12 +448,9 @@ class PDFGenerator {
         }
     }
 }
-
-
-import SwiftUI
-
 struct HomeView: View {
     var patient = Patient(name: "John Doe", dateOfBirth: Date(), gender: "Male", treatments: [])
+
     
     var body: some View {
         NavigationStack {
@@ -584,9 +581,16 @@ struct RecordingView: View {
     var body: some View {
         VStack {
             ScrollView {
-                Text(modelResponse.isEmpty ? transcribedText : modelResponse)
+                Text(modelResponse)
                     .padding()
             }
+            // Show progress view when loading
+            if isLoading {
+                ProgressView("Processing...")
+                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                    .padding()
+            }
+
             
             if !audioService.isRecording && !transcribedText.isEmpty && !isLoading {
                 Button("View Report") {
@@ -599,10 +603,13 @@ struct RecordingView: View {
                     Task {
                         if audioService.isRecording {
                             if let audioURL = audioService.stopRecording() {
+                                isLoading = true
                                 audioService.transcribeRecording { result in
                                     Task {
+                                       
                                         transcribedText = result
                                         await generateModelResponse() // Send to AWS after transcription
+                                        isLoading = false
                                     }
                                 }
                             }
@@ -616,6 +623,7 @@ struct RecordingView: View {
                         .frame(width: 64, height: 64)
                         .foregroundColor(audioService.isRecording ? .red : .blue)
                 }
+                .disabled(isLoading)
 
                 .padding()
             }
@@ -640,6 +648,7 @@ struct RecordingView: View {
     }
     
     private func generateModelResponse() async {
+        
         let treatment = Treatment(name: treatmentName, transcription: transcribedText)
         isLoading = true
         modelResponse = ""
@@ -847,31 +856,17 @@ struct ReportsListView: View {
             ForEach(patients) { patient in
                 Section {
                     ForEach(patient.treatments) { treatment in
-                        HStack {
-                            NavigationLink {
-                                VStack {
-                                    if let pdfURL = treatment.pdfURL {
-                                        PDFKitView(url: pdfURL)
-                                    } else {
-                                        Text("PDF not available")
-                                    }
-                                    
-                                    if let audioURL = treatment.audioURL {
-                                        AudioPlayerView(audioURL: audioURL)
-                                            .padding()
-                                    }
-                                }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(treatment.name)
-                                        .font(.headline)
-                                    
-                                    Text(dateFormatter.string(from: treatment.date))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                        NavigationLink {
+                            TreatmentDetailView(treatment: treatment)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(treatment.name)
+                                    .font(.headline)
+                                
+                                Text(dateFormatter.string(from: treatment.date))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-
                         }
                     }
                 } header: {
@@ -884,36 +879,10 @@ struct ReportsListView: View {
             }
         }
         .navigationTitle("Reports")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    if let firstTreatment = patients.first?.treatments.first {
-                        sharePDF(treatment: firstTreatment)
-                    }
-                }) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .disabled(patients.isEmpty || patients.first?.treatments.isEmpty == true)
-            }
-        }
-    }
-    
-    private func sharePDF(treatment: Treatment) {
-        guard let pdfURL = treatment.pdfURL else { return }
-        
-        let activityVC = UIActivityViewController(
-            activityItems: [pdfURL],
-            applicationActivities: nil
-        )
-        
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootVC = window.rootViewController {
-            activityVC.popoverPresentationController?.sourceView = rootVC.view
-            rootVC.present(activityVC, animated: true)
-        }
     }
 }
+
+
 
 struct PDFKitView: UIViewRepresentable {
     let url: URL
@@ -936,6 +905,7 @@ struct PDFKitView: UIViewRepresentable {
 // MARK: - App Entry Point
 @main
 struct HackAI2025: App {
+    
     let container: ModelContainer
     
     init() {
