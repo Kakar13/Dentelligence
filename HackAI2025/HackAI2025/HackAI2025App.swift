@@ -25,7 +25,8 @@ struct HackAI2025App: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+//            ContentView()
+            TestUI()
         }
         .modelContainer(sharedModelContainer)
     }
