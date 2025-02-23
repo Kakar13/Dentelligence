@@ -395,6 +395,10 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+>>>>>>> 3683b45185150a68ac07d24713d0d84928997f38
+>>>>>>> Stashed changes
 =======
 >>>>>>> 3683b45185150a68ac07d24713d0d84928997f38
 >>>>>>> Stashed changes
@@ -445,6 +449,10 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+>>>>>>> 3683b45185150a68ac07d24713d0d84928997f38
+>>>>>>> Stashed changes
 =======
 >>>>>>> 3683b45185150a68ac07d24713d0d84928997f38
 >>>>>>> Stashed changes
