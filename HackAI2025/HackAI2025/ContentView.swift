@@ -11,9 +11,10 @@ struct HomeView: View {
             VStack(spacing: 30) {
                 
                 // App Title
-                Text("Dentology")
+                Text("Tooth Mechanic")
                     .font(.largeTitle)
                     .bold()
+    
                 
                 // Logo Image
                 Image("tooth")
@@ -87,6 +88,8 @@ struct NewReportView: View {
                 }
             }
             .pickerStyle(.menu)
+            
+          
             
             Section {
                 Button(action: {
